@@ -12,7 +12,7 @@ __set_seed: !apply:torch.manual_seed [!ref <seed>]
 
 # Set up folders for reading from and writing to
 exp_name: task1_pipeline_setup
-dataset_folder: ../dataset
+data_folder: ../dataset
 output_folder: !ref ../logs/<exp_name>
 model_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -27,7 +27,7 @@ test_annotation: !ref <data_folder>/test.json
 train_folder:
   - !ref <data_folder>/L3DAS22_Task1_train100
 valid_folder: !ref <data_folder>/L3DAS22_Task1_dev
-test_folder: !ref <data_folder>/L3DAS22_Task1_test
+test_folder: !ref <data_folder>/L3DAS22_Task1_dev
 
 # logs with training statistics
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
@@ -44,15 +44,11 @@ test_dataloader_options:
     batch_size: 1
 
 # # Model construction
-# depth: 1
-# model: !new:denoiser.models.hybriddenoiser
-#     in_channels: 8
-#     out_channels: 1
-#     kernel_size: 55
-#     base_channels: 40
-#     use_sinc: False
+depth: 5
+model: !new:denoiser.models.HybridDenoiser
+    depth: !ref <depth>
 
-loss: !new:mlsp_challenge.losses.PerceptualLoss
+loss: !new:denoiser.losses.PerceptualLoss
     PRETRAINED_MODEL_PATH: '../models/wav2vec_large.pt'
 
 modules:
