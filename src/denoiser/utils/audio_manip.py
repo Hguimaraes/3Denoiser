@@ -4,7 +4,7 @@ import speechbrain as sb
 """
 Read predictor and target for L3DAS22
 """
-def read_audio(wav_files, is_test: bool):
+def read_audio(wav_files, is_test:bool=False):
     # Read the waveform
     predictor = sb.dataio.dataio.read_audio_multichannel(
         wav_files['predictors']
@@ -36,14 +36,14 @@ def sample(
 
 
 """
-Pad an audio to a power of 2**depth
+Pad an audio to a power of 4**depth
 necessary for decimate operation in the network
 """
 def pad_power(
     audio: torch.Tensor, 
     depth: int
 ):
-    power = 2**depth-1
+    power = 4**depth-1
     n = audio.shape[0]
     audio = audio.transpose(0, 1)
 

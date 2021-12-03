@@ -33,29 +33,29 @@ def main(hparams, hparams_file, run_opts, overrides):
     datasets = create_datasets(hparams)
 
     # Initialize the Trainer
-    # brain = DenoiserBrain(
-    #     modules=hparams["modules"],
-    #     opt_class=hparams["opt_class"],
-    #     hparams=hparams,
-    #     run_opts=run_opts,
-    #     checkpointer=hparams["checkpointer"],
-    # )
+    brain = DenoiserBrain(
+        modules=hparams["modules"],
+        opt_class=hparams["opt_class"],
+        hparams=hparams,
+        run_opts=run_opts,
+        checkpointer=hparams["checkpointer"],
+    )
 
     # # Call the training loop
-    # se_brain.fit(
-    #     epoch_counter=se_brain.hparams.epoch_counter,
-    #     train_set=datasets["train"],
-    #     valid_set=datasets["valid"],
-    #     train_loader_kwargs=hparams["dataloader_options"],
-    #     valid_loader_kwargs=hparams["dataloader_options"],
-    # )
+    brain.fit(
+        epoch_counter=brain.hparams.epoch_counter,
+        train_set=datasets["train"],
+        valid_set=datasets["valid"],
+        train_loader_kwargs=hparams["dataloader_options"],
+        valid_loader_kwargs=hparams["dataloader_options"],
+    )
 
-    # # Apply on test set
-    # se_brain.predict(
-    #     test_set=datasets["test"],
-    #     max_key="task1_metric",
-    #     test_loader_kwargs=hparams["test_dataloader_options"]
-    # )
+    # Apply on test set
+    brain.predict(
+        test_set=datasets["test"],
+        max_key="task1_metric",
+        test_loader_kwargs=hparams["test_dataloader_options"]
+    )
 
     return None
 

@@ -131,3 +131,5 @@ dmypy.json
 # datasets and logs
 dataset/
 logs/
+pretrained/
+nbs/

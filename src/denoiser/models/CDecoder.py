@@ -6,3 +6,10 @@ class CDecoderBlock(nn.Module):
     
     def forward(self, x):
         return x
+
+class CDecoder(nn.Module):
+    def __init__(self):
+        super(CDecoder, self).__init__()
+    
+    def forward(self, x):
+        return x

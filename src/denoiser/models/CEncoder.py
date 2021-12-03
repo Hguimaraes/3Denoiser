@@ -6,3 +6,11 @@ class CEncoderBlock(nn.Module):
     
     def forward(self, x):
         return x
+
+
+class CEncoder(nn.Module):
+    def __init__(self):
+        super(CEncoder, self).__init__()
+    
+    def forward(self, x):
+        return x

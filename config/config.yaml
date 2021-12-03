@@ -11,7 +11,7 @@ seed: 42
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 
 # Set up folders for reading from and writing to
-exp_name: task1_pipeline_setup
+exp_name: time_domain_10epochs_5layers_stoiloss_resampling_beamforming
 data_folder: ../dataset
 output_folder: !ref ../logs/<exp_name>
 model_folder: !ref <output_folder>/save
@@ -34,19 +34,35 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
     save_file: !ref <train_log>
 
 # Training Parameters
-max_train_sample_size: 32000    # Maximum number of samples to use during train
-number_of_epochs: 50
+train_sampling: True
+max_train_sample_size: 48000    # Maximum number of samples to use during train
+number_of_epochs: 30
 batch_size: 16
-learning_rate: 0.0001
+
 dataloader_options:
     batch_size: !ref <batch_size>
+
 test_dataloader_options:
     batch_size: 1
+
+# Optimizer and Scheduler parameters
+gradient_accumulation: 5
+lr: 0.0001
+weight_decay: 0.00002
+base_lr: 0.00001
+max_lr: !ref <lr>
+step_size: 2500  # 4 times number of iterations/epoch (2 to 10 is suggested)
+mode: exp_range # mode of learning rate schedule (triangular, triangular2, exp_range)
+gamma: 0.9998  # divides learning rate by 3 over the first 20 epochs
 
 # # Model construction
 depth: 5
 model: !new:denoiser.models.HybridDenoiser
     depth: !ref <depth>
+    in_ch: 1
+    base_ch: 48
+    T_ks: 8
+    T_stride: 4
 
 loss: !new:denoiser.losses.PerceptualLoss
     PRETRAINED_MODEL_PATH: '../models/wav2vec_large.pt'
@@ -56,9 +72,16 @@ modules:
     loss: !ref <loss>
 
 # # Optimizer parameters
-opt_class: !name:torch.optim.Adam
-    lr: !ref <learning_rate>
+opt_class: !name:torch.optim.AdamW
+    lr: !ref <lr>
     weight_decay: 0.01
+
+lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
+    mode: !ref <mode>
+    gamma: !ref <gamma>
+    base_lr: !ref <base_lr>
+    max_lr: !ref <max_lr>
+    step_size: !ref <step_size>
 
 # Save state of the training process
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
