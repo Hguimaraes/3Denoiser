@@ -23,14 +23,7 @@ class TEncoderBlock(nn.Module):
                 kernel_size=1,
                 stride=1
             ),
-            nn.GLU(),
-
-            # Instance Normalization
-            sb.nnet.normalization.InstanceNorm1d(
-                input_size=out_channels,
-                track_running_stats=False,
-                affine=True
-            )
+            nn.GLU()
         )
 
     def forward(self, x):
@@ -64,5 +57,4 @@ class TEncoder(nn.Module):
         for l in self.TEnc:
             x = l(x)
             x_skip.append(x)
-
         return x, x_skip

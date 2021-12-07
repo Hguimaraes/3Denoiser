@@ -13,9 +13,9 @@ def read_audio(wav_files, is_test:bool=False):
     target = None
     if not is_test:
         target = sb.dataio.dataio.read_audio(wav_files['wave_target'])
-        target = torch.unsqueeze(target, -1)
+        target = torch.unsqueeze(target, 0)
 
-    return predictor, target
+    return predictor.transpose(0, 1), target
 
 
 """
@@ -33,22 +33,3 @@ def sample(
         predictor = predictor[offset:(offset+max_size), :]
     
     return predictor, target
-
-
-"""
-Pad an audio to a power of 4**depth
-necessary for decimate operation in the network
-"""
-def pad_power(
-    audio: torch.Tensor, 
-    depth: int
-):
-    power = 4**depth-1
-    n = audio.shape[0]
-    audio = audio.transpose(0, 1)
-
-    if n % (power + 1) != 0:
-        diff = (n|power) + 1 - n
-        audio = torch.nn.functional.pad(audio, (0, diff))
-
-    return audio

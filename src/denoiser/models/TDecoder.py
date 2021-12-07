@@ -3,31 +3,35 @@ import torch.nn as nn
 import torch.nn.functional as F
 import speechbrain as sb
 
+class Upsampling(nn.Module):
+    def __init__(self, factor):
+        super(Upsampling, self).__init__()
+        self.factor = factor
+
+        self.deconv = lambda x: F.interpolate(
+            x, scale_factor=self.factor, mode='linear', align_corners=True
+        )
+    
+    def forward(self, x):
+        x = x.permute(0, 2, 1)
+        x = self.deconv(x)
+        return x.permute(0, 2, 1)
+
 class TDecoderBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride):
         super(TDecoderBlock, self).__init__()
-        self.conv_1x1 = nn.Sequential(
+        self.conv = nn.Sequential(
             sb.nnet.CNN.Conv1d(
                 in_channels=in_channels,
                 out_channels=in_channels,
-                kernel_size=3,
+                kernel_size=1,
                 stride=1
             ),
             nn.GLU()
         )
-        self.trans_conv = nn.Sequential(
-            sb.nnet.CNN.ConvTranspose1d(
-                in_channels=in_channels//2,
-                out_channels=out_channels//2,
-                kernel_size=kernel_size,
-                stride=stride,
-                padding=2
-            ),
-            sb.nnet.normalization.InstanceNorm1d(
-                input_size=out_channels//2,
-                track_running_stats=False,
-                affine=True
-            ),
+
+        self.upsampling = nn.Sequential(
+            Upsampling(factor=stride),
             nn.GELU()
         )
     
@@ -36,8 +40,8 @@ class TDecoderBlock(nn.Module):
         x = x + x_skip
 
         # Decoder blocks
-        x = self.conv_1x1(x)
-        x = self.trans_conv(x)
+        x = self.conv(x)
+        x = self.upsampling(x)
         return x
 
 

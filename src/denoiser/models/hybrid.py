@@ -1,13 +1,12 @@
 import julius
+import torch
 import torch.nn as nn
 
 from denoiser.models import TEncoder
 from denoiser.models import TDecoder
 from denoiser.models import Bootleneck
-from denoiser.utils import pad_power
 
 from speechbrain.processing.features import STFT, ISTFT
-from speechbrain.lobes.beamform_multimic import DelaySum_Beamformer
 
 class HybridDenoiser(nn.Module):
     def __init__(
@@ -17,15 +16,24 @@ class HybridDenoiser(nn.Module):
         base_ch:int=64,
         T_ks:int=8,
         T_stride:int=4,
-        sample_rate:int=16000
+        sample_rate:int=16000,
+        normalize:bool=True,
+        floor:float=1e-3,
+        resampling:bool=True
     ):
         super(HybridDenoiser, self).__init__()
         self.depth = depth
+        self.normalize = normalize
+        self.floor = floor
+        self.stride = T_stride
+        self.kernel_size = T_ks
+        self.resampling = resampling
+
         self.TEnc = TEncoder(
             in_ch=in_ch,
             base_ch=base_ch,
-            kernel_size=T_ks,
-            stride=T_stride,
+            kernel_size=self.kernel_size,
+            stride=self.stride,
             depth=depth
         )
 
@@ -33,45 +41,77 @@ class HybridDenoiser(nn.Module):
 
         self.TDec = TDecoder(
             base_ch=base_ch,
-            kernel_size=T_ks,
-            stride=T_stride,
+            kernel_size=self.kernel_size,
+            stride=self.stride,
             depth=depth
         )
 
         # Feature functions
         self.stft = STFT(sample_rate=sample_rate)
         self.istft = ISTFT(sample_rate=sample_rate)
-        self.beamformer = DelaySum_Beamformer(sampling_rate=sample_rate)
 
     def forward(self, x):
-        # Resample to avoid aliasing artifacts
-        x = julius.resample_frac(x, 1, 2)
+        # Select W channel from both microphones
+        x = x[:, :, (0, 4)]
 
-        # Speechbrain format
-        x = x.transpose(1, 2) # B, C, L => B, L, C
+        if self.normalize:
+            mono = x.mean(dim=2, keepdim=True)
+            std = mono.std(dim=1, keepdim=True)
+            x = x / (self.floor + std)
+        else:
+            std = 1
+
+        # Resample to avoid aliasing artifacts
+        if self.resampling:
+            x = self.resample(x, 1, 2)
 
         # Extract features
-        # x, x_spec = self.compute_features(x)
+        length = x.shape[1]
+        x, x_spec = self.compute_features(x)
 
         # Time-Domain network
-        x, x_skip = self.TEnc(x[:, :, 0].unsqueeze(2))
+        x, x_skip = self.TEnc(x)
         x = self.bootleneck(x)
         x = self.TDec(x, x_skip)
-        
-        x = x.transpose(1, 2) # B, L, C => B, C, L
+
+        # Remove pad
+        x = x[:, :length, :]
 
         # Return the sampled back audio
-        return julius.resample_frac(x, 2, 1)
+        if self.resampling:
+            x = self.resample(x, 2, 1)
+        
+        return x * std
     
+    """
+    Extract spectrogram and manipulate the waveform
+    """
     def compute_features(self, x):
-        n = x.shape[1]
+        x = self.pad_power(x)
 
         # Spectrogram
         # Xs = self.stft(x)
         Xs = None
 
-        # Apply Delay and Sum Beamforming
-        x = self.beamformer(x)
-        x = nn.functional.pad(x, (0, 0, 0, n - x.shape[1]), "constant", 0)
-        
         return x, Xs
+    
+    """
+    Pad an audio to a power of 4**depth
+    necessary for decimate operation in the network
+    """
+    def pad_power(self, batch: torch.Tensor):
+        power = self.stride**self.depth-1
+        length = batch.shape[1]
+        batch = batch.transpose(1, 2)
+
+        if length % (power + 1) != 0:
+            diff = (length|power) + 1 - length
+            batch = torch.nn.functional.pad(batch, (0, diff))
+
+        return batch.transpose(1, 2)
+    
+    def resample(self, x, from_sample, to_sample):
+        x = x.transpose(1, 2) # B, L, C => B, C, L
+        x = julius.resample_frac(x, from_sample, to_sample)
+
+        return x.transpose(1, 2) # B, C, L => B, L, C

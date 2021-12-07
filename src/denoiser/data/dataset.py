@@ -3,7 +3,6 @@ import speechbrain
 from speechbrain.dataio.dataset import DynamicItemDataset
 
 from denoiser.utils import sample
-from denoiser.utils import pad_power
 from denoiser.utils import read_audio
 
 def create_datasets(hparams):
@@ -12,7 +11,6 @@ def create_datasets(hparams):
     @speechbrain.utils.data_pipeline.takes("wav_files")
     @speechbrain.utils.data_pipeline.provides("predictor", "target")
     def audio_pipeline(wav_files):
-        depth = hparams['depth'] + 1
         predictor, target = read_audio(wav_files)
 
         # Sampling procedure
@@ -20,23 +18,21 @@ def create_datasets(hparams):
             max_size = hparams['max_train_sample_size']
             predictor, target = sample(predictor, target, max_size)
 
-        return pad_power(predictor, depth=depth), pad_power(target, depth=depth)
+        return predictor, target
 
 
     @speechbrain.utils.data_pipeline.takes("wav_files")
     @speechbrain.utils.data_pipeline.provides("predictor", "target")
     def audio_pipeline_valid(wav_files):
-        depth = hparams['depth'] + 1
         predictor, target = read_audio(wav_files)
-        return pad_power(predictor, depth=depth), pad_power(target, depth=depth)
+        return predictor, target
 
 
     @speechbrain.utils.data_pipeline.takes("wav_files")
     @speechbrain.utils.data_pipeline.provides("predictor")
     def audio_pipeline_test(wav_files):
-        depth = hparams['depth'] + 1
         predictor, _ = read_audio(wav_files, is_test=True)
-        return pad_power(predictor, depth=depth)
+        return predictor
     
     dynamic_items_map = {
         'train': [audio_pipeline],
@@ -57,6 +53,6 @@ def create_datasets(hparams):
             replacements={"data_root": hparams["data_folder"]},
             dynamic_items=dynamic_items,
             output_keys=output_keys,
-        ).filtered_sorted(sort_key="length")
+        ).filtered_sorted(sort_key="length", reverse=False)
 
     return datasets
