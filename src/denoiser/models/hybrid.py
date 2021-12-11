@@ -7,6 +7,7 @@ from denoiser.models import TDecoder
 from denoiser.models import Bootleneck
 
 from speechbrain.processing.features import STFT, ISTFT
+from speechbrain.processing.features import spectral_magnitude
 
 class HybridDenoiser(nn.Module):
     def __init__(
@@ -19,7 +20,9 @@ class HybridDenoiser(nn.Module):
         sample_rate:int=16000,
         normalize:bool=True,
         floor:float=1e-3,
-        resampling:bool=True
+        resampling:bool=True,
+        compute_stft:object=None,
+        compute_istft:object=None
     ):
         super(HybridDenoiser, self).__init__()
         self.depth = depth
@@ -28,6 +31,8 @@ class HybridDenoiser(nn.Module):
         self.stride = T_stride
         self.kernel_size = T_ks
         self.resampling = resampling
+        self.compute_stft = compute_stft
+        self.compute_istft = compute_istft
 
         self.TEnc = TEncoder(
             in_ch=in_ch,
@@ -90,11 +95,12 @@ class HybridDenoiser(nn.Module):
         x = self.pad_power(x)
 
         # Spectrogram
-        # Xs = self.stft(x)
-        Xs = None
+        feats = self.compute_stft(x)
+        feats = spectral_magnitude(feats, power=0.5)
+        feats = torch.log1p(feats)
 
-        return x, Xs
-    
+        return x, feats
+
     """
     Pad an audio to a power of 4**depth
     necessary for decimate operation in the network

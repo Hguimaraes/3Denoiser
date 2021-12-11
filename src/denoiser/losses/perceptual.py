@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch_stoi import NegSTOILoss
+from geomloss import SamplesLoss
 from speechbrain.lobes.models.huggingface_wav2vec import HuggingFaceWav2Vec2
 from speechbrain.nnet.loss.stoi_loss import stoi_loss
 
@@ -15,18 +15,24 @@ class PerceptualLoss(nn.Module):
         self.alpha = alpha
         self.stft_loss = MultiResolutionSTFTLoss()
 
-        # self.model = HuggingFaceWav2Vec2("facebook/wav2vec2-base-960h", save_path="../models/")
-        # self.model = self.model.to("cuda:0")
-        # self.model.eval()
+        self.model = HuggingFaceWav2Vec2(
+            "facebook/wav2vec2-base-960h",
+            save_path=PRETRAINED_MODEL_PATH, 
+            freeze=True, 
+            freeze_feature_extractor=True
+        )
+        self.model = self.model.to("cuda:0")
+        self.model.eval()
 
-        self.dist_metric = nn.L1Loss()
+        self.dist_metric = lambda x, y: torch.abs(x - y)
 
     def forward(self, y_hat, y, lens=None):
         # Unfold predictions
         y_hat, y = y_hat.squeeze(2), y.squeeze(2)
 
-        fn_loss = stoi_loss(y_hat, y, lens=lens)
+        # fn_loss = stoi_loss(y_hat, y, lens=lens)
         sc_loss, mag_loss = self.stft_loss(y_hat, y)
-        # rep_y_hat, rep_y = map(self.model, [y_hat.squeeze(1), y.squeeze(1)])
-        # return self.alpha*self.dist_metric(rep_y_hat, rep_y).mean() + stoi_loss.mean()
-        return fn_loss + sc_loss + mag_loss
+        rep_y_hat, rep_y = map(self.model, [y_hat, y])
+        # return self.alpha*self.dist_metric(rep_y_hat, rep_y).mean() + fn_loss
+        # return fn_loss + sc_loss + mag_loss
+        return self.alpha*self.dist_metric(rep_y_hat, rep_y).mean() + sc_loss + mag_loss

@@ -11,7 +11,7 @@ seed: 42
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 
 # Set up folders for reading from and writing to
-exp_name: time_domain_250epochs_5layers_stoiloss_resampling_conformer_100h
+exp_name: time_domain_250epochs_5layers_pfpl_conformer_100h
 data_folder: ../dataset
 output_folder: !ref ../logs/<exp_name>
 model_folder: !ref <output_folder>/save
@@ -37,7 +37,7 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 train_sampling: True
 max_train_sample_size: 48000    # Maximum number of samples to use during train
 number_of_epochs: 250
-batch_size: 8
+batch_size: 4
 
 dataloader_options:
     batch_size: !ref <batch_size>
@@ -47,13 +47,27 @@ test_dataloader_options:
 
 # Optimizer and Scheduler parameters
 gradient_accumulation: 2
-lr: 0.001
-weight_decay: 0.00002
-base_lr: 0.00001
-max_lr: !ref <lr>
-step_size: 4000  # 4 times number of iterations/epoch (2 to 10 is suggested)
-mode: exp_range # mode of learning rate schedule (triangular, triangular2, exp_range)
-gamma: 0.9998  # divides learning rate by 3 over the first 20 epochs
+lr: 0.0005
+
+# STFT
+sample_rate: 16000
+win_length: 32
+hop_length: 16
+n_fft: 512
+window_fn: !name:torch.hamming_window
+
+compute_stft: !new:speechbrain.processing.features.STFT
+    sample_rate: !ref <sample_rate>
+    win_length: !ref <win_length>
+    hop_length: !ref <hop_length>
+    n_fft: !ref <n_fft>
+    window_fn: !ref <window_fn>
+
+compute_istft: !new:speechbrain.processing.features.ISTFT
+    sample_rate: !ref <sample_rate>
+    win_length: !ref <win_length>
+    hop_length: !ref <hop_length>
+    window_fn: !ref <window_fn>
 
 # # Model construction
 depth: 5
@@ -64,9 +78,11 @@ model: !new:denoiser.models.HybridDenoiser
     T_ks: 8
     T_stride: 4
     resampling: True
+    compute_stft: !ref <compute_stft>
+    compute_istft: !ref <compute_istft>
 
 loss: !new:denoiser.losses.PerceptualLoss
-    PRETRAINED_MODEL_PATH: '../models/wav2vec_large.pt'
+    PRETRAINED_MODEL_PATH: '../pretrained/'
 
 modules:
     model: !ref <model>
@@ -76,12 +92,10 @@ modules:
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
 
-lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
-    mode: !ref <mode>
-    gamma: !ref <gamma>
-    base_lr: !ref <base_lr>
-    max_lr: !ref <max_lr>
-    step_size: !ref <step_size>
+lr_annealing: !new:speechbrain.nnet.schedulers.NewBobScheduler
+    initial_value: !ref <lr>
+    improvement_threshold: 0.0025
+    annealing_factor: 0.9
 
 # Save state of the training process
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer

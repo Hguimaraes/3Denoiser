@@ -54,18 +54,18 @@ class DenoiserBrain(sb.Brain):
 
         # At the end of validation, we can write stats and checkpoints
         if (stage == sb.Stage.VALID):
-            # old_lr, new_lr = self.hparams.lr_annealing(epoch)
-            # sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
-
             # Summarize the statistics from the stage for record-keeping.
             stats = {
                 "loss": stage_loss,
                 "task1_metric": self.l3das_task1_metric.summarize("average"),
             }
 
+            old_lr, new_lr = self.hparams.lr_annealing(stats["task1_metric"])
+            sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
+
             # The train_logger writes a summary to stdout and to the logfile.
             self.hparams.train_logger.log_stats(
-                stats_meta={"Epoch": epoch}, #, "LR": old_lr},
+                stats_meta={"Epoch": epoch, "LR": old_lr},
                 train_stats={"loss": self.train_loss},
                 valid_stats=stats,
             )
