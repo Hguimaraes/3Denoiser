@@ -65,7 +65,7 @@ def create_json(
 ):
     # Sample the a_wav_list
     if sample:
-        a_wav_list = np.random.choice(a_wav_list, 250)
+        a_wav_list = np.random.choice(a_wav_list, 400)
 
     # Call the specific function for testset
     if is_test:
@@ -93,12 +93,12 @@ def create_json(
                 "predictors": {
                     "files": [utterance, utterance_b],
                     "start": 0,
-                    "stop": min(audio_len, 10*sample_rate)
+                    "stop": audio_len
                 },
                 "wave_target": {
                     "file": wav_target,
                     "start": 0,
-                    "stop": min(audio_len, 10*sample_rate)
+                    "stop": audio_len
                 },
             },
             "length": audio_len,

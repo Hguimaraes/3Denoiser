@@ -11,7 +11,7 @@ seed: 1234
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 
 # Set up folders for reading from and writing to
-exp_name: hybrid_CNNTransformer_10epochs_pfplstoiloss_100h
+exp_name: stftransformer_8layers_50epochs_pfplstoiloss_100h
 data_folder: ../dataset
 output_folder: !ref ../logs/<exp_name>
 model_folder: !ref <output_folder>/save
@@ -36,18 +36,21 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 
 # Training Parameters
 train_sampling: True
-max_train_sample_size: 160000    # Maximum number of samples to use during train
+max_train_sample_size: 80000    # Maximum number of samples to use during train
 number_of_epochs: 50
 batch_size: 4
 
-dataloader_options:
+train_dataloader_options:
+    batch_size: !ref <batch_size>
+
+valid_dataloader_options:
     batch_size: !ref <batch_size>
 
 test_dataloader_options:
     batch_size: 1
 
 # Optimizer and Scheduler parameters
-lr: 0.0001
+lr: 0.0005
 gradient_accumulation: 2
 clip_grad_norm: 10
 loss_upper_lim: 100
@@ -79,24 +82,19 @@ resynth: !name:speechbrain.processing.signal_processing.resynthesize
     istft: !ref <compute_istft>
 
 # # Model construction
-model: !new:denoiser.models.HybridDenoiser
-    in_channels: 1
-    T_kernel_size: 512
-    T_stride: 256
-    Z_kernel_size: 3
-    Z_stride: 1
-    rep_channels: 512
+model: !new:denoiser.models.STFTransformer
+    n_fft: !ref <n_fft>
     attn_base_ch: 512
     dropout: 0.1
-    num_layers: 12
-    d_ffn: 1024
-    nhead: 8
+    num_layers: 8
+    d_ffn: 512
+    nhead: 16
     causal: False
-    sample_rate: !ref <sample_rate>
     compute_stft: !ref <compute_stft>
     resynth: !ref <resynth>
     resampling: False
-    n_fft: !ref <n_fft>
+    embedding_type: "cnntransformer"
+    sampling_rate: !ref <sample_rate>
 
 loss: !new:denoiser.losses.PerceptualLoss
     PRETRAINED_MODEL_PATH: '../pretrained/'
@@ -112,7 +110,7 @@ opt_class: !name:torch.optim.Adam
 lr_scheduler: !new:speechbrain.nnet.schedulers.ReduceLROnPlateau
     factor: 0.5
     patience: 2
-    dont_halve_until_epoch: 85
+    dont_halve_until_epoch: 10
 
 # Save state of the training process
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer

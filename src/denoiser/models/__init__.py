@@ -1,11 +1,9 @@
-from denoiser.models.TEncoder import TEncoder
-from denoiser.models.TDecoder import TDecoder
-from denoiser.models.CEncoder import CEncoder
-from denoiser.models.CDecoder import CDecoder
-from denoiser.models.bootleneck import Bootleneck
-from denoiser.models.hybrid import HybridDenoiser
+from denoiser.models.masknet import MaskNet
+from denoiser.models.hymasknet import HybridMaskNet
+from denoiser.models.hydenoiser import HybridDenoiser
+from denoiser.models.fcn2d import FCN2D
+from denoiser.models.stftransformer import STFTransformer
 
 __all__ = [
-    'HybridDenoiser', 'TEncoder', 'TDecoder', 
-    'Bootleneck', 'CEncoder', 'CDecoder'
+    'HybridDenoiser', 'HybridMaskNet', 'MaskNet', 'FCN2D', 'STFTransformer'
 ]

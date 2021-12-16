@@ -2,12 +2,17 @@ import speechbrain as sb
 
 import os
 import torch
+import logging
 import numpy as np
 import speechbrain as sb
 from tqdm.contrib import tqdm
 from torch.utils.data import DataLoader
 from denoiser.losses import task1_metric
+import speechbrain.nnet.schedulers as schedulers
 
+
+# Logger info
+logger = logging.getLogger(__name__)
 
 class DenoiserBrain(sb.Brain):
     def compute_forward(self, batch, stage):
@@ -60,12 +65,14 @@ class DenoiserBrain(sb.Brain):
                 "task1_metric": self.l3das_task1_metric.summarize("average"),
             }
 
-            old_lr, new_lr = self.hparams.lr_annealing(stats["task1_metric"])
-            sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
+            current_lr, next_lr = self.hparams.lr_scheduler(
+                [self.optimizer], epoch, stage_loss
+            )
+            schedulers.update_learning_rate(self.optimizer, next_lr)
 
             # The train_logger writes a summary to stdout and to the logfile.
             self.hparams.train_logger.log_stats(
-                stats_meta={"Epoch": epoch, "LR": old_lr},
+                stats_meta={"Epoch": epoch, "LR": current_lr},
                 train_stats={"loss": self.train_loss},
                 valid_stats=stats,
             )
@@ -80,14 +87,36 @@ class DenoiserBrain(sb.Brain):
         predictions = self.compute_forward(batch, sb.Stage.TRAIN)
         loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
 
-        # normalize the loss by gradient_accumulation step
-        (loss / self.hparams.gradient_accumulation).backward()
+        if self.hparams.threshold_byloss:
+            th = self.hparams.threshold
+            loss_to_keep = loss[loss > th]
+            if loss_to_keep.nelement() > 0:
+                loss = loss_to_keep.mean()
+        else:
+            loss = loss.mean()
+        
+         # the fix for computational problems
+        if (loss < self.hparams.loss_upper_lim and loss.nelement() > 0):
+            # normalize the loss by gradient_accumulation step
+            (loss / self.hparams.gradient_accumulation).backward()
 
-        if self.step % self.hparams.gradient_accumulation == 0:
-            # gradient clipping & early stop if loss is not finite
-            self.check_gradients(loss)
-            self.optimizer.step()
-            self.optimizer.zero_grad()
+            if self.step % self.hparams.gradient_accumulation == 0:
+                if self.hparams.clip_grad_norm >= 0:
+                    torch.nn.utils.clip_grad_norm_(
+                        self.modules.parameters(), self.hparams.clip_grad_norm
+                    )
+
+                self.check_gradients(loss)
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+        else:
+            self.nonfinite_count += 1
+            logger.info(
+                "infinite loss or empty loss! it happened {} times so far - skipping this batch".format(
+                    self.nonfinite_count
+                )
+            )
+            loss.data = torch.tensor(0).to(self.device)
 
         return loss.detach()
 
@@ -133,7 +162,7 @@ class DenoiserBrain(sb.Brain):
             os.mkdir(npy_path)
 
         for count, (utt, length) in enumerate(zip(utt_id, utt_length)):
-            audio = batch[count, 0, :length].detach().cpu()
+            audio = batch[count, :length, 0].detach().cpu()
             # Save as wav file to listen to the result
             sb.dataio.dataio.write_audio(
                 filepath=os.path.join(

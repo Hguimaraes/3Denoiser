@@ -46,8 +46,8 @@ def main(hparams, hparams_file, run_opts, overrides):
         epoch_counter=brain.hparams.epoch_counter,
         train_set=datasets["train"],
         valid_set=datasets["valid"],
-        train_loader_kwargs=hparams["dataloader_options"],
-        valid_loader_kwargs=hparams["dataloader_options"],
+        train_loader_kwargs=hparams["train_dataloader_options"],
+        valid_loader_kwargs=hparams["valid_dataloader_options"],
     )
 
     # Apply on test set
