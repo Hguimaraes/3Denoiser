@@ -37,7 +37,7 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 # Training Parameters
 train_sampling: True
 max_train_sample_size: 80000    # Maximum number of samples to use during train
-number_of_epochs: 30
+number_of_epochs: 10
 batch_size: 2
 
 train_dataloader_options:
