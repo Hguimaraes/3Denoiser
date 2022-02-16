@@ -11,7 +11,7 @@ seed: 1234
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 
 # Set up folders for reading from and writing to
-exp_name: fc2n2d_5layers_48bch_stft_30epochs_pfplstoiloss_100h
+exp_name: td_fcn_5layers_10epochs_100h
 data_folder: ../dataset
 output_folder: !ref ../logs/<exp_name>
 model_folder: !ref <output_folder>/save
@@ -37,7 +37,7 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 # Training Parameters
 train_sampling: True
 max_train_sample_size: 80000    # Maximum number of samples to use during train
-number_of_epochs: 15
+number_of_epochs: 30
 batch_size: 2
 
 train_dataloader_options:
@@ -57,38 +57,16 @@ loss_upper_lim: 100
 threshold_byloss: True
 threshold: -100
 
-# STFT
-sample_rate: 16000
-win_length: 32
-hop_length: 16
-n_fft: 512
-window_fn: !name:torch.hamming_window
-
-compute_stft: !new:speechbrain.processing.features.STFT
-    sample_rate: !ref <sample_rate>
-    win_length: !ref <win_length>
-    hop_length: !ref <hop_length>
-    n_fft: !ref <n_fft>
-    window_fn: !ref <window_fn>
-
-compute_istft: !new:speechbrain.processing.features.ISTFT
-    sample_rate: !ref <sample_rate>
-    win_length: !ref <win_length>
-    hop_length: !ref <hop_length>
-    window_fn: !ref <window_fn>
-
-resynth: !ref <compute_istft>
-
 # # Model construction
-model: !new:denoiser.models.FC2N2D
-    rep_channels: 48
-    kernel_size: (9, 9)
-    compute_stft: !ref <compute_stft>
-    resynth: !ref <resynth>
-    resampling: False
+model: !new:denoiser.models.TDFCN1D
+    num_channels: 4
+    rep_channels: 80
+    kernel_size: 55
 
 loss: !new:denoiser.losses.PerceptualLoss
     PRETRAINED_MODEL_PATH: '../pretrained/'
+    model_architecture: 'wav2vec2'
+    distance_metric: 'l2'
 
 modules:
     model: !ref <model>
@@ -101,7 +79,7 @@ opt_class: !name:torch.optim.Adam
 lr_scheduler: !new:speechbrain.nnet.schedulers.ReduceLROnPlateau
     factor: 0.5
     patience: 2
-    dont_halve_until_epoch: 10
+    dont_halve_until_epoch: 15
 
 # Save state of the training process
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer

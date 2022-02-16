@@ -1,11 +1,8 @@
-from denoiser.models.masknet import MaskNet
-from denoiser.models.hymasknet import HybridMaskNet
-from denoiser.models.hydenoiser import HybridDenoiser
-from denoiser.models.fcn2d import FCN2D
-from denoiser.models.fc2n2d import FC2N2D
-from denoiser.models.stftransformer import STFTransformer
+from denoiser.models.time_domain import TDFCN1D
+from denoiser.models.time_frequency import TFFCN2D
+from denoiser.models.time_frequency import TFFC2N2D
+
 
 __all__ = [
-    'HybridDenoiser', 'HybridMaskNet', 'MaskNet',
-    'FCN2D', 'FC2N2D', 'STFTransformer'
+    'TDFCN1D', 'TFFCN2D', 'TFFC2N2D'
 ]

@@ -9,11 +9,18 @@ from torch_stoi import NegSTOILoss
 # Paper: https://arxiv.org/pdf/2010.15174v3.pdf
 # https://github.com/aleXiehta/PhoneFortifiedPerceptualLoss
 class PerceptualLoss(nn.Module):
-    def __init__(self, PRETRAINED_MODEL_PATH:str, alpha:float=.5):
+    def __init__(self, 
+        PRETRAINED_MODEL_PATH:str, 
+        alpha:float=.5,
+        model_architecture:str='wav2vec2',
+        distance_metric:str='l2'
+    ):
         super().__init__()
         self.alpha = alpha
-        self.stoi = NegSTOILoss(sample_rate=16000)
+        self.distance_metric = distance_metric
+        self.model_architecture = model_architecture
 
+        self.stoi = NegSTOILoss(sample_rate=16000)
         self.model = HuggingFaceWav2Vec2(
             "facebook/wav2vec2-base-960h",
             save_path=PRETRAINED_MODEL_PATH

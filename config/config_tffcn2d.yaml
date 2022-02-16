@@ -11,7 +11,7 @@ seed: 1234
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 
 # Set up folders for reading from and writing to
-exp_name: fcn_5layers_stft_50epochs_pfplstoiloss_100h
+exp_name: tf_fcn2d_5layers_10epochs_100h
 data_folder: ../dataset
 output_folder: !ref ../logs/<exp_name>
 model_folder: !ref <output_folder>/save
@@ -82,8 +82,8 @@ resynth: !name:speechbrain.processing.signal_processing.resynthesize
     istft: !ref <compute_istft>
 
 # # Model construction
-model: !new:denoiser.models.FCN2D
-    rep_channels: 64
+model: !new:denoiser.models.TFFCN2D
+    rep_channels: 96
     kernel_size: (9, 9)
     compute_stft: !ref <compute_stft>
     resynth: !ref <resynth>
