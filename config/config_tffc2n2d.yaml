@@ -9,9 +9,10 @@
 
 seed: 1234
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
+sample_rate: 16000
 
 # Set up folders for reading from and writing to
-exp_name: tf_fc2n2d_5layers_10epochs_100h
+exp_name: tf_fc2n2d_5layers_10epochs_100h_wav2vec2_kld
 data_folder: ../dataset
 output_folder: !ref ../logs/<exp_name>
 model_folder: !ref <output_folder>/save
@@ -21,7 +22,8 @@ npy_result: !ref <output_folder>/npy_results
 
 # Path where data manifest files will be stored
 # The data manifest files are created by the data preparation script.
-train_annotation: !ref <data_folder>/train.json
+train_annotation: !ref <
+>/train.json
 valid_annotation: !ref <data_folder>/valid.json
 test_annotation: !ref <data_folder>/test.json
 
@@ -38,7 +40,7 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 train_sampling: True
 max_train_sample_size: 80000    # Maximum number of samples to use during train
 number_of_epochs: 10
-batch_size: 2
+batch_size: 4
 
 train_dataloader_options:
     batch_size: !ref <batch_size>
@@ -58,7 +60,6 @@ threshold_byloss: True
 threshold: -100
 
 # STFT
-sample_rate: 16000
 win_length: 32
 hop_length: 16
 n_fft: 512
@@ -88,7 +89,11 @@ model: !new:denoiser.models.TFFC2N2D
     resampling: False
 
 loss: !new:denoiser.losses.PerceptualLoss
-    PRETRAINED_MODEL_PATH: '../pretrained/'
+    PRETRAINED_MODEL_PATH: '../pretrained/wav2vec2/'
+    alpha: .5
+    model_architecture: 'wav2vec2'
+    distance_metric: 'kld'
+    sample_rate: !ref <sample_rate>
 
 modules:
     model: !ref <model>

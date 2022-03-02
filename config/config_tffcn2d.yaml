@@ -9,6 +9,7 @@
 
 seed: 1234
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
+sample_rate: 16000
 
 # Set up folders for reading from and writing to
 exp_name: tf_fcn2d_5layers_10epochs_100h
@@ -58,7 +59,6 @@ threshold_byloss: True
 threshold: -100
 
 # STFT
-sample_rate: 16000
 win_length: 32
 hop_length: 16
 n_fft: 512
@@ -91,6 +91,10 @@ model: !new:denoiser.models.TFFCN2D
 
 loss: !new:denoiser.losses.PerceptualLoss
     PRETRAINED_MODEL_PATH: '../pretrained/'
+    alpha: .5
+    model_architecture: 'wav2vec2'
+    distance_metric: 'l2'
+    sample_rate: !ref <sample_rate>
 
 modules:
     model: !ref <model>

@@ -18,14 +18,12 @@ class DenoiserBrain(sb.Brain):
     def compute_forward(self, batch, stage):
         batch = batch.to(self.device)
         noisy_wavs, lens = batch.predictor # B, C, L
-        noisy_wavs = noisy_wavs.transpose(1, 2) # B, L, C
 
         return self.modules.model(noisy_wavs)
     
     def compute_objectives(self, predictions, batch, stage):
         # Get clean targets
-        targets, lens = batch.target
-        targets = targets.transpose(1, 2) # B, L, C
+        targets, lens = batch.target # B, L, C
 
         # Compare the waveforms
         loss = self.modules.loss(predictions, targets, lens)

@@ -14,15 +14,16 @@ def read_audio(wav_files, is_test:bool=False):
     if not is_test:
         target = sb.dataio.dataio.read_audio(wav_files['wave_target'])
         target = torch.unsqueeze(target, 0)
+        target = target.transpose(0, 1)
 
-    return predictor.transpose(0, 1), target
+    return predictor, target
 
 
 """
 Get a random subsample of the original audio
 """
 def sample(
-    predictor: torch.Tensor, 
+    predictor: torch.Tensor,
     target: torch.Tensor, 
     max_size: int
 ):
