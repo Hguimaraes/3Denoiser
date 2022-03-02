@@ -29,7 +29,7 @@ class PerceptualLoss(nn.Module):
 
     """
     def __init__(self, 
-        PRETRAINED_MODEL_PATH:str, 
+        PRETRAINED_MODEL_PATH:str,
         alpha:float=.5,
         model_architecture:str='wav2vec2',
         distance_metric:str='l2',
@@ -52,7 +52,7 @@ class PerceptualLoss(nn.Module):
         
         if self.distance_metric not in dist_types:
             raise ValueError(
-                f'distance_metric must be one of {model_types}'
+                f'distance_metric must be one of {distance_metric}'
             )
 
         self.stoi = NegSTOILoss(sample_rate=sample_rate)
