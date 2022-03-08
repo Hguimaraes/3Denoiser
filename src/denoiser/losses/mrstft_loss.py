@@ -117,7 +117,7 @@ class MultiResolutionSTFTLoss(torch.nn.Module):
         self.factor_sc = factor_sc
         self.factor_mag = factor_mag
 
-    def forward(self, x, y):
+    def forward(self, x, y, lens=None):
         """Calculate forward propagation.
         Args:
             x (Tensor): Predicted signal (B, T).
@@ -126,6 +126,9 @@ class MultiResolutionSTFTLoss(torch.nn.Module):
             Tensor: Multi resolution spectral convergence loss value.
             Tensor: Multi resolution log STFT magnitude loss value.
         """
+        # Unfold predictions
+        x, y = x.squeeze(-1), y.squeeze(-1)
+
         sc_loss = 0.0
         mag_loss = 0.0
         for f in self.stft_losses:
@@ -135,4 +138,4 @@ class MultiResolutionSTFTLoss(torch.nn.Module):
         sc_loss /= len(self.stft_losses)
         mag_loss /= len(self.stft_losses)
 
-        return self.factor_sc*sc_loss, self.factor_mag*mag_loss
+        return self.factor_sc*sc_loss + self.factor_mag*mag_loss

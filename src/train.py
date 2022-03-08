@@ -1,5 +1,4 @@
 import sys
-import datetime
 import speechbrain as sb
 from hyperpyyaml import load_hyperpyyaml
 

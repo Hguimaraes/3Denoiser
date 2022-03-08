@@ -1,0 +1,123 @@
+# #################################
+# Parameters of the final model
+#
+# Authors:
+#  * Heitor Guimarães 2022
+#  * Miguel Arjona    2022
+#  * Wesley Beccaro   2022
+# #################################
+
+seed: 1234
+__set_seed: !apply:torch.manual_seed [!ref <seed>]
+
+sample_rate: 16000
+loss_type: 'specloss'
+distance_metric: 'mrstft'
+
+# Set up folders for reading from and writing to
+exp_name: !ref tf_fc2n2d_5layers_10epochs_100h_<loss_type>_<distance_metric>
+data_folder: ../dataset
+output_folder: !ref ../logs/<exp_name>
+model_folder: !ref <output_folder>/save
+train_log: !ref <output_folder>/train_log.txt
+audio_result: !ref <output_folder>/audio_results
+npy_result: !ref <output_folder>/npy_results
+
+# Path where data manifest files will be stored
+# The data manifest files are created by the data preparation script.
+train_annotation: !ref <data_folder>/train.json
+valid_annotation: !ref <data_folder>/valid.json
+test_annotation: !ref <data_folder>/test.json
+
+train_folder:
+  - !ref <data_folder>/L3DAS22_Task1_train100
+valid_folder: !ref <data_folder>/L3DAS22_Task1_dev
+test_folder: !ref <data_folder>/L3DAS22_Task1_dev
+
+# logs with training statistics
+train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
+    save_file: !ref <train_log>
+
+# Training Parameters
+train_sampling: True
+max_train_sample_size: 80000    # Maximum number of samples to use during train
+number_of_epochs: 10
+batch_size: 4
+
+train_dataloader_options:
+    batch_size: !ref <batch_size>
+
+valid_dataloader_options:
+    batch_size: !ref <batch_size>
+
+test_dataloader_options:
+    batch_size: 1
+
+# Optimizer and Scheduler parameters
+lr: 0.0001
+gradient_accumulation: 2
+clip_grad_norm: 10
+loss_upper_lim: 100
+threshold_byloss: True
+threshold: -100
+
+# STFT
+win_length: 32
+hop_length: 16
+n_fft: 512
+window_fn: !name:torch.hamming_window
+
+compute_stft: !new:speechbrain.processing.features.STFT
+    sample_rate: !ref <sample_rate>
+    win_length: !ref <win_length>
+    hop_length: !ref <hop_length>
+    n_fft: !ref <n_fft>
+    window_fn: !ref <window_fn>
+
+compute_istft: !new:speechbrain.processing.features.ISTFT
+    sample_rate: !ref <sample_rate>
+    win_length: !ref <win_length>
+    hop_length: !ref <hop_length>
+    window_fn: !ref <window_fn>
+
+resynth: !ref <compute_istft>
+
+# # Model construction
+model: !new:denoiser.models.TFFC2N2D
+    rep_channels: 48
+    kernel_size: (9, 9)
+    compute_stft: !ref <compute_stft>
+    resynth: !ref <resynth>
+    resampling: False
+
+loss: !new:denoiser.losses.MultiResolutionSTFTLoss
+    fft_sizes: [512, 512, 1024, 1024, 2048]
+    hop_sizes: [256, 10, 96, 16, 160]
+    win_lengths: [512, 96, 960, 160, 480]
+    window: "hann_window"
+    factor_sc: 0.5
+    factor_mag: 0.5
+
+modules:
+    model: !ref <model>
+    loss: !ref <loss>
+
+# # Optimizer parameters
+opt_class: !name:torch.optim.Adam
+    lr: !ref <lr>
+
+lr_scheduler: !new:speechbrain.nnet.schedulers.ReduceLROnPlateau
+    factor: 0.5
+    patience: 2
+    dont_halve_until_epoch: 5
+
+# Save state of the training process
+checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
+    checkpoints_dir: !ref <model_folder>
+    recoverables:
+        model: !ref <model>
+        optimizer: !ref <opt_class>
+        counter: !ref <epoch_counter>
+
+epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
+    limit: !ref <number_of_epochs>
