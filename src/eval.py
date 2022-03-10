@@ -1,20 +1,25 @@
+
 import json
+import torch
+import jiwer
+import logging
 import librosa
+import warnings
 import numpy as np
 from glob import glob
 from pesq import pesq
 from tqdm import tqdm
-
-import warnings
-import torch
-import jiwer
 from pystoi import stoi
+
 import transformers
 from transformers import Wav2Vec2ForMaskedLM
 from transformers import Wav2Vec2Tokenizer
 
+from denoiser.utils import CompositeEval
+
+
 SR = 16000 # sample_rate
-ENHANCED_FOLDER = "../logs/tf_fc2n2d_5layers_10epochs_100h_wavloss_stoi/npy_results/"
+ENHANCED_FOLDER = "../logs/tf_fc2n2d_5layers_10epochs_100h_specloss_mrstft/npy_results/"
 CLEANED_FOLDER = "../dataset/L3DAS22_Task1_dev/labels/"
 
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -25,9 +30,6 @@ wer_model = Wav2Vec2ForMaskedLM.from_pretrained("facebook/wav2vec2-base-960h")
 def main(enhanced_folder, clean_folder):
     enhanced_signals = sorted(list(glob(enhanced_folder + "*.npy")))
     reference_signals = sorted(list(glob(clean_folder + "*.wav")))
-
-    enhanced_signals = enhanced_signals[:50]
-    reference_signals = reference_signals[:50]
 
     se_metrics = {
         'stoi': {}, 'wer': {}, 'M': {}, 'csig': {}, 
@@ -47,8 +49,15 @@ def main(enhanced_folder, clean_folder):
         ref_signal, sr = librosa.load(path_ref, sr=None, mono=True)
         enh_signal = np.load(path_enh)
 
-        # PESQ
-        se_metrics['pesq'][fname_ref] = pesq_eval(ref_signal, enh_signal, SR, "wb")
+        # Composite metrics
+        pesq_score = pesq_eval(ref_signal, enh_signal, SR, "wb")
+        se_metrics['pesq'][fname_ref] = pesq_score
+
+        [csig, cbak, covl, ssnr] = CompositeEval(pesq_score, ref_signal, enh_signal)
+        se_metrics['csig'][fname_ref] = csig
+        se_metrics['cbak'][fname_ref] = cbak
+        se_metrics['covl'][fname_ref] = covl
+        se_metrics['ssnr'][fname_ref] = ssnr
 
         # L3DAS22 metrics
         [_stoi, _wer, m] = l3das22_metric(ref_signal, enh_signal, SR)
@@ -56,12 +65,14 @@ def main(enhanced_folder, clean_folder):
         se_metrics['wer'][fname_ref] = _wer
         se_metrics['M'][fname_ref] = m
 
-    
-
-    print("STOI = {:.2f}".format(np.mean(list(se_metrics['stoi'].values()))))
-    print("WER  = {:.2f}".format(np.mean(list(se_metrics['wer'].values()))))
-    print("M    = {:.2f}".format(np.mean(list(se_metrics['M'].values()))))
-    print("PESQ = {:.2f}".format(np.mean(list(se_metrics['pesq'].values()))))
+    print("STOI = {:.2f}".format(np.nanmean(list(se_metrics['stoi'].values()))))
+    print("WER  = {:.2f}".format(np.nanmean(list(se_metrics['wer'].values()))))
+    print("M    = {:.2f}".format(np.nanmean(list(se_metrics['M'].values()))))
+    print("PESQ = {:.2f}".format(np.nanmean(list(se_metrics['pesq'].values()))))
+    print("CSIG = {:.2f}".format(np.nanmean(list(se_metrics['csig'].values()))))
+    print("CBAK = {:.2f}".format(np.nanmean(list(se_metrics['cbak'].values()))))
+    print("COVL = {:.2f}".format(np.nanmean(list(se_metrics['covl'].values()))))
+    print("SSNR = {:.2f}".format(np.nanmean(list(se_metrics['ssnr'].values()))))
 
     with open("se_metrics.json", 'w') as f:
         json.dump(se_metrics, f)
