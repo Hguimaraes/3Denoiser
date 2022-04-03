@@ -9,7 +9,8 @@ from tqdm.contrib import tqdm
 from torch.utils.data import DataLoader
 from denoiser.losses import task1_metric
 import speechbrain.nnet.schedulers as schedulers
-
+from scipy.io import wavfile
+from pesq import pesq
 
 # Logger info
 logger = logging.getLogger(__name__)
@@ -32,8 +33,15 @@ class DenoiserBrain(sb.Brain):
         if (stage != sb.Stage.TRAIN):
             self.l3das_task1_metric.append(
                 batch.id,
-                np.squeeze(targets.cpu().numpy()),
-                np.squeeze(predictions.cpu().numpy())
+                np.squeeze(targets.cpu().detach().numpy()),
+                np.squeeze(predictions.cpu().detach().numpy())
+            )
+
+            self.pesq_metric.append(
+                batch.id, 
+                predict=predictions.squeeze(-1).cpu().detach(),
+                target=targets.squeeze(-1).cpu().detach(),
+                lengths=lens
             )
 
         return loss
@@ -44,10 +52,24 @@ class DenoiserBrain(sb.Brain):
             metric=self.modules.loss
         )
 
+        # Define function taking (prediction, target) for parallel eval
+        def pesq_eval(pred_wav, target_wav):
+            """Computes the PESQ evaluation metric"""
+            return pesq(
+                fs=16000,
+                ref=target_wav.numpy(),
+                deg=pred_wav.numpy(),
+                mode="wb",
+            )
+
         # Add a metric for evaluation sets
         if stage != sb.Stage.TRAIN:
             self.l3das_task1_metric = sb.utils.metric_stats.MetricStats(
                 metric=task1_metric
+            )
+
+            self.pesq_metric = sb.utils.metric_stats.MetricStats(
+                metric=pesq_eval, n_jobs=1, batch_eval=False
             )
 
     def on_stage_end(self, stage, stage_loss, epoch=None):
@@ -60,6 +82,7 @@ class DenoiserBrain(sb.Brain):
             # Summarize the statistics from the stage for record-keeping.
             stats = {
                 "loss": stage_loss,
+                "pesq": self.pesq_metric.summarize("average"),
                 "task1_metric": self.l3das_task1_metric.summarize("average"),
             }
 
@@ -162,13 +185,13 @@ class DenoiserBrain(sb.Brain):
         for count, (utt, length) in enumerate(zip(utt_id, utt_length)):
             audio = batch[count, :length, 0].detach().cpu()
             # Save as wav file to listen to the result
-            sb.dataio.dataio.write_audio(
-                filepath=os.path.join(
+            wavfile.write(
+                os.path.join(
                     audio_path, 
                     "{}.wav".format(utt)
                 ),
-                audio=audio/audio.max()*0.9, # Normalization
-                samplerate=16000
+                rate=16000, 
+                data=np.iinfo(np.int16).max*audio.numpy().astype(np.int16)
             )
 
             # Save as .npy for submission
